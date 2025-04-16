@@ -156,7 +156,6 @@ func (s *keeperMetadataStorage) Update(ctx context.Context, newKeeper *secretv0a
 	var oldKeeper *secretv0alpha1.Keeper
 	err := s.db.GetSqlxSession().WithTransaction(ctx, func(sess *session.SessionTx) error {
 		// Validate before updating that any `secureValues` referenced exist and do not reference other third-party keepers.\
-
 		if err := s.validateSecureValueReferences(ctx, sess, newKeeper); err != nil {
 			return err
 		}
@@ -229,7 +228,6 @@ func (s *keeperMetadataStorage) Delete(ctx context.Context, namespace xkube.Name
 		if _, err := sess.Exec(ctx, q, req.GetArgs()...); err != nil {
 			return fmt.Errorf("deleting row: %w", err)
 		}
-
 		return nil
 	})
 	if err != nil {
@@ -274,6 +272,7 @@ func (s *keeperMetadataStorage) List(ctx context.Context, namespace xkube.Namesp
 	if err != nil {
 		return nil, fmt.Errorf("listing keepers %q: %w", q, err)
 	}
+	defer func() { _ = rows.Close() }()
 
 	keepers := make([]secretv0alpha1.Keeper, 0)
 
@@ -304,6 +303,9 @@ func (s *keeperMetadataStorage) List(ctx context.Context, namespace xkube.Namesp
 		if labelSelector.Matches(labels.Set(keeper.Labels)) {
 			keepers = append(keepers, *keeper)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read rows error: %w", err)
 	}
 
 	return &secretv0alpha1.KeeperList{
