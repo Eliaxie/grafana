@@ -16,6 +16,7 @@ import { ContactPointDetails } from './contactPoint/ContactPointDetails';
 import { ContactPointSelector } from './contactPoint/ContactPointSelector';
 import { MuteTimingFields } from './route-settings/MuteTimingFields';
 import { RoutingSettings } from './route-settings/RouteSettings';
+import {ActiveTimingFields} from "./route-settings/ActiveTimingFields";
 
 interface AlertManagerManualRoutingProps {
   alertManager: AlertManagerDataSource;
@@ -114,6 +115,7 @@ export function AlertManagerManualRouting({ alertManager }: AlertManagerManualRo
               />
             </Stack>
             <MuteTimingFields alertmanager={alertManagerName} />
+            <ActiveTimingFields alertmanager={alertManagerName} />
             <RoutingSettings alertManager={alertManagerName} />
           </Stack>
         </CollapsableSection>
