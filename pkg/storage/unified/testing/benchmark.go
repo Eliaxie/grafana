@@ -227,6 +227,8 @@ func runSearchBackendBenchmarkWriteThroughput(ctx context.Context, backend resou
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			batch := make([]*resource.BulkIndexItem, 0, 1000)
+
 			for jobID := range jobs {
 				doc := &resource.IndexableDocument{
 					Key: &resource.ResourceKey{
@@ -243,14 +245,31 @@ func runSearchBackendBenchmarkWriteThroughput(ctx context.Context, backend resou
 					},
 				}
 
-				writeStart := time.Now()
-				err := index.Write(doc)
-				if err != nil {
-					errors <- err
-					return
-				}
+				batch = append(batch, &resource.BulkIndexItem{
+					Action: resource.BulkActionIndex,
+					Doc:    doc,
+				})
 
-				results <- time.Since(writeStart)
+				// If we've collected 100 items or this is the last job, process the batch
+				if len(batch) == 100 || jobID == opts.NumResources-1 {
+					writeStart := time.Now()
+					err := index.BulkIndex(&resource.BulkIndexRequest{
+						Items: batch,
+					})
+					if err != nil {
+						errors <- err
+						return
+					}
+
+					// Record the latency for each document in the batch
+					latency := time.Since(writeStart)
+					for i := 0; i < len(batch); i++ {
+						results <- latency
+					}
+
+					// Reset the batch
+					batch = batch[:0]
+				}
 			}
 		}()
 	}
@@ -340,6 +359,7 @@ func BenchmarkIndexServer(tb testing.TB, ctx context.Context, backend resource.S
 	// Discard the latencies from the initial index build.
 	for len(latencies) < (opts.NumGroups * opts.NumResourceTypes * opts.NumNamespaces) {
 		time.Sleep(10 * time.Millisecond)
+		fmt.Println("waiting for initial index build to complete", len(latencies))
 	}
 	latencies = make([]float64, 0, opts.NumResources)
 
